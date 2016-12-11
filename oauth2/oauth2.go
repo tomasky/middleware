@@ -1,7 +1,9 @@
 package oauth2
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/RangelReale/osin"
 	"github.com/RangelReale/osin/example"
@@ -14,8 +16,29 @@ type Config struct {
 }
 type auth2Middleware struct {
 	server *osin.Server
+	debug  bool
 }
 
+//CheckBearerAuth req
+func CheckBearerAuth(ctx *iris.Context) string {
+	authHeader := string(ctx.RequestCtx.Request.Header.Peek("Authorization"))
+	authForm := ctx.FormValueString("code")
+	if authHeader == "" && authForm == "" {
+		return ""
+	}
+	token := authForm
+	if authHeader != "" {
+		s := strings.SplitN(authHeader, " ", 2)
+		if (len(s) != 2 || strings.ToLower(s[0]) != "bearer") && token == "" {
+			return ""
+		}
+		//Use authorization header token only if token type is bearer else query string access token would be returned
+		if len(s) > 0 && strings.ToLower(s[0]) == "bearer" {
+			token = s[1]
+		}
+	}
+	return token
+}
 func (b *auth2Middleware) init() {
 	sconfig := osin.NewServerConfig()
 	sconfig.AllowedAuthorizeTypes = osin.AllowedAuthorizeType{osin.CODE, osin.TOKEN}
@@ -24,25 +47,87 @@ func (b *auth2Middleware) init() {
 	sconfig.AllowGetAccessRequest = true
 	sconfig.AllowClientSecretInParams = true
 	b.server = osin.NewServer(sconfig, example.NewTestStorage())
+	b.debug = true
 }
 
 //Serve ctx
 func (b *auth2Middleware) Serve(ctx *iris.Context) {
-	println("request to /products")
-	ctx.Next()
+	if b.isGranted(ctx) {
+
+		ctx.Next()
+	}
 }
 
 //ServerHTTP res,req
 func (b *auth2Middleware) ServeHTTP(res http.ResponseWriter, req *http.Request) {
-	code := ""
+	reqPath := req.URL.Path
+	authorize := "/authorize"
+	token := "/toke"
+	if strings.HasSuffix(reqPath, authorize) {
+		b.authorize(res, req)
+	}
+	if strings.HasSuffix(reqPath, token) {
+		b.token(res, req)
+	}
+	println(reqPath)
+}
+func (b *auth2Middleware) isGranted(ctx *iris.Context) bool {
+	code := CheckBearerAuth(ctx)
 	ret, _ := b.server.Storage.LoadAccess(code)
+	return ret != nil || b.debug
+
 }
-func (b *auth2Middleware) isGrant(ctx *iris.Context) bool {
-	return true
+func (b *auth2Middleware) token(w http.ResponseWriter, r *http.Request) {
+	resp := b.server.NewResponse()
+	defer resp.Close()
+
+	if ar := b.server.HandleAccessRequest(resp, r); ar != nil {
+		switch ar.Type {
+		case osin.AUTHORIZATION_CODE:
+			ar.Authorized = true
+		case osin.REFRESH_TOKEN:
+			ar.Authorized = true
+		case osin.PASSWORD:
+			if ar.Username == "test" && ar.Password == "test" {
+				ar.Authorized = true
+			}
+		case osin.CLIENT_CREDENTIALS:
+			ar.Authorized = true
+		case osin.ASSERTION:
+			if ar.AssertionType == "urn:osin.example.complete" && ar.Assertion == "osin.data" {
+				ar.Authorized = true
+			}
+		}
+		b.server.FinishAccessRequest(resp, r, ar)
+	}
+	if resp.IsError && resp.InternalError != nil {
+		fmt.Printf("ERROR: %s\n", resp.InternalError)
+	}
+	if !resp.IsError {
+		resp.Output["custom_parameter"] = 19923
+	}
+	osin.OutputJSON(resp, w, r)
 }
-func (b *auth2Middleware) token(ctx *iris.Context) {
-}
-func (b *auth2Middleware) authorized(ctx *iris.Context) {
+
+func (b *auth2Middleware) authorize(w http.ResponseWriter, r *http.Request) {
+	resp := b.server.NewResponse()
+	defer resp.Close()
+
+	if ar := b.server.HandleAuthorizeRequest(resp, r); ar != nil {
+		if !example.HandleLoginPage(ar, w, r) {
+			return
+		}
+		ar.UserData = struct{ Login string }{Login: "test"}
+		ar.Authorized = true
+		b.server.FinishAuthorizeRequest(resp, r, ar)
+	}
+	if resp.IsError && resp.InternalError != nil {
+		fmt.Printf("ERROR: %s\n", resp.InternalError)
+	}
+	if !resp.IsError {
+		resp.Output["custom_parameter"] = 187723
+	}
+	osin.OutputJSON(resp, w, r)
 }
 
 //New take config
