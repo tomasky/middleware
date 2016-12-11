@@ -62,7 +62,7 @@ func (b *auth2Middleware) Serve(ctx *iris.Context) {
 func (b *auth2Middleware) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	reqPath := req.URL.Path
 	authorize := "/authorize"
-	token := "/toke"
+	token := "/token"
 	if strings.HasSuffix(reqPath, authorize) {
 		b.authorize(res, req)
 	}
