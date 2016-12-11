@@ -1,4 +1,4 @@
-##How to use
+## How to use
 ```go
 package main
 
@@ -15,7 +15,7 @@ type User struct {
 
 func main() {
 	g := iris.Party("/api/v1")
-	authentication := oauth2.New(oauth2.Config{})
+	authentication := oauth2.New(oauth2.Config{Debug: true, Storage: example.NewTestStorage()})
 	g.Use(authentication)
 	g.Get("/user/:id", func(ctx *iris.Context) {
 

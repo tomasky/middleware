@@ -13,10 +13,12 @@ import (
 
 //Config .
 type Config struct {
+	Debug   bool
+	Storage osin.Storage
 }
 type auth2Middleware struct {
 	server *osin.Server
-	debug  bool
+	config Config
 }
 
 //CheckBearerAuth req
@@ -39,15 +41,15 @@ func CheckBearerAuth(ctx *iris.Context) string {
 	}
 	return token
 }
-func (b *auth2Middleware) init() {
+func (b *auth2Middleware) init(config Config) {
 	sconfig := osin.NewServerConfig()
 	sconfig.AllowedAuthorizeTypes = osin.AllowedAuthorizeType{osin.CODE, osin.TOKEN}
 	sconfig.AllowedAccessTypes = osin.AllowedAccessType{osin.AUTHORIZATION_CODE,
 		osin.REFRESH_TOKEN, osin.PASSWORD, osin.CLIENT_CREDENTIALS, osin.ASSERTION}
 	sconfig.AllowGetAccessRequest = true
 	sconfig.AllowClientSecretInParams = true
-	b.server = osin.NewServer(sconfig, example.NewTestStorage())
-	b.debug = true
+	b.config = config
+	b.server = osin.NewServer(sconfig, config.Storage)
 }
 
 //Serve ctx
@@ -74,7 +76,7 @@ func (b *auth2Middleware) ServeHTTP(res http.ResponseWriter, req *http.Request) 
 func (b *auth2Middleware) isGranted(ctx *iris.Context) bool {
 	code := CheckBearerAuth(ctx)
 	ret, _ := b.server.Storage.LoadAccess(code)
-	return ret != nil || b.debug
+	return ret != nil || b.config.Debug
 
 }
 func (b *auth2Middleware) token(w http.ResponseWriter, r *http.Request) {
@@ -133,7 +135,7 @@ func (b *auth2Middleware) authorize(w http.ResponseWriter, r *http.Request) {
 //New take config
 func New(c Config) iris.HandlerFunc {
 	b := &auth2Middleware{}
-	b.init()
+	b.init(c)
 	//ret := iris.ToHandlerFunc(b.ServeHTTP)
 	h := fasthttpadaptor.NewFastHTTPHandlerFunc(b.ServeHTTP)
 	return iris.HandlerFunc((func(ctx *iris.Context) {
