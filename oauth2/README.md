@@ -3,7 +3,7 @@
 package main
 
 import (
-	"oauth2"
+	"github.com/tomasky/middleware/oauth2"
 
 	"github.com/RangelReale/osin/example"
 	"github.com/kataras/iris"
@@ -11,6 +11,7 @@ import (
 
 //User name ,email
 type User struct {
+	Uid   int
 	Name  string `json:"name" xml:"name" form:"name"`
 	Email string `json:"email" xml:"email" form:"email"`
 }
@@ -32,16 +33,23 @@ func main() {
 
 		// userRepo, imaginary database service <- your only job.
 		//user := userRepo.GetByID(userID)
-		user := new(User)
+		if userID, er := ctx.ParamInt("id"); er == nil {
+			user := User{UID: userID}
+			ctx.JSON(iris.StatusOK, user)
+			return
+		}
+		// userRepo, imaginary database service <- your only job.
+		//user := userRepo.GetByID(userID)
 		// send back a response to the client,
 		// .JSON: content type as application/json; charset="utf-8"
 		// iris.StatusOK: with 200 http status code.
 		//
 		// send user as it is or make use of any json valid golang type,
-		// like the iris.Map{"username" : user.Username}.
-		ctx.JSON(iris.StatusOK, user)
+		ret := iris.Map{"status": iris.StatusOK, "result": nil}
+		ctx.JSON(iris.StatusOK, ret)
 
 	})
 
 	iris.Listen("localhost:5800")
-}```
+}
+```
