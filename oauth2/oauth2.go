@@ -139,7 +139,13 @@ func New(c Config) iris.HandlerFunc {
 	//ret := iris.ToHandlerFunc(b.ServeHTTP)
 	h := fasthttpadaptor.NewFastHTTPHandlerFunc(b.ServeHTTP)
 	return iris.HandlerFunc((func(ctx *iris.Context) {
-		h(ctx.RequestCtx)
-		b.Serve(ctx)
+		reqPath := ctx.PathString()
+		if strings.HasPrefix(reqPath, "/login/oauth") {
+
+			h(ctx.RequestCtx)
+		} else {
+			b.Serve(ctx)
+
+		}
 	}))
 }

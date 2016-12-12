@@ -3,7 +3,9 @@
 package main
 
 import (
-    "github.com/tomasky/middleware/oauth2"
+	"oauth2"
+
+	"github.com/RangelReale/osin/example"
 	"github.com/kataras/iris"
 )
 
@@ -14,9 +16,14 @@ type User struct {
 }
 
 func main() {
+	r := iris.Party("/login/oauth")
 	g := iris.Party("/api/v1")
 	authentication := oauth2.New(oauth2.Config{Debug: true, Storage: example.NewTestStorage()})
 	g.Use(authentication)
+	r.Use(authentication)
+	r.Get("/authorize", nil)
+	r.Get("/token", nil)
+
 	g.Get("/user/:id", func(ctx *iris.Context) {
 
 		// take the :id from the path, parse to integer
@@ -37,5 +44,4 @@ func main() {
 	})
 
 	iris.Listen("localhost:5800")
-}
-```
+}```
